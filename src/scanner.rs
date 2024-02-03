@@ -23,7 +23,7 @@ impl<T> Scanner<T> {
         Self { toks }
     }
 
-    pub fn is_done(&mut self) -> bool {
+    pub fn is_done(&self) -> bool {
         self.toks.is_empty()
     }
 
