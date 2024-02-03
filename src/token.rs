@@ -1,7 +1,60 @@
 use crate::{Scanner, ScannerAction};
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Delimiter {
+    Parenthesis,
+    Brace,
+    Bracket,
+    None
+}
+
+impl Delimiter {
+    fn from(c : &char) -> Option<Self> {
+        Self::from_open(c).or(Self::from_close(c))
+    }
+ 
+    fn from_open(c : &char) -> Option<Self> {
+        match c {
+            '(' => Some(Self::Parenthesis),
+            '[' => Some(Self::Bracket),
+            '{' => Some(Self::Brace),
+            '\0' => Some(Self::None),
+            _ => None,
+        }
+    }
+
+    fn from_close(c : &char) -> Option<Self> {
+        match c {
+            ')' => Some(Self::Parenthesis),
+            ']' => Some(Self::Bracket),
+            '}' => Some(Self::Brace),
+            '\0' => Some(Self::None),
+            _ => None,
+        }
+    }
+
+    pub fn open(&self) -> char {
+        match self {
+            Self::Parenthesis => '(',
+            Self::Bracket => '[',
+            Self::Brace => '{',
+            Self::None => '\0', // TODO: What character?
+        }
+    }
+
+    pub fn close(&self) -> char {
+        match self {
+            Self::Parenthesis => ')',
+            Self::Bracket => ']',
+            Self::Brace => '}',
+            Self::None => '\0', // TODO: What character?
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
+    Group(Delimiter, Vec<Token>),
     Ident(String),
     Literal(i64),
     Punct(char),
@@ -72,18 +125,31 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
         return get_number(scanner).unwrap() // TODO: Handle error
     }
 
+    if let Some(delim) = scanner.transform(|c| Delimiter::from_open(c)) {
+        let toks = tokenize_scanner(scanner);
+        skip_whitespace(scanner);
+
+        if scanner.take(|c| *c == delim.close()).is_none() {
+            panic!("Missing closing delimiter, expected \"{}\" but found \"{:?}\"", delim.close(), scanner.peek()) // TODO: Handle
+        }
+
+        return Some(Token::Group(delim, toks))
+    }
+
     None
 }
 
-pub fn tokenize(code : &str) -> Vec<Token> {
+fn tokenize_scanner(scanner : &mut Scanner<char>) -> Vec<Token> {
     let mut toks = Vec::new();
-
-    let mut scanner = Scanner::new(code.chars().collect());
-    while let Some(tok) = get_tok(&mut scanner) {
+    while let Some(tok) = get_tok(scanner) {
         toks.push(tok);
     }
-
     toks
+}
+
+pub fn tokenize(code : &str) -> Vec<Token> {
+    let mut scanner = Scanner::new(code.chars().collect());
+    tokenize_scanner(&mut scanner)
 }
 
 #[cfg(test)]
@@ -118,6 +184,22 @@ mod test {
             Token::Literal(0xF337),
             Token::Literal(0o171467),
             Token::Literal(0b1111001100110111),
+        ]);
+    }
+
+    #[test]
+    fn group() {
+        let code = "0 () (0) ((0)) [0] {0}";
+        let toks = tokenize(code);
+        assert_eq!(toks, vec![
+            Token::Literal(0),
+            Token::Group(Delimiter::Parenthesis, vec![]),
+            Token::Group(Delimiter::Parenthesis, vec![Token::Literal(0)]),
+            Token::Group(Delimiter::Parenthesis, vec![
+                Token::Group(Delimiter::Parenthesis, vec![Token::Literal(0)])
+            ]),
+            Token::Group(Delimiter::Bracket, vec![Token::Literal(0)]),
+            Token::Group(Delimiter::Brace, vec![Token::Literal(0)]),
         ]);
     }
 }
