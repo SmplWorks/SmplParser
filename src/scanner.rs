@@ -35,17 +35,17 @@ impl<T> Scanner<T> {
     }
 
     pub fn transform<U>(&mut self, cb : impl FnOnce(&T) -> Option<U>) -> Option<U> {
-        let tok = self.toks.get(self.cursor)?;
+        let tok = self.peek()?;
         let res = cb(tok)?;
         self.cursor += 1;
         Some(res)
     }
     
-    pub fn test(&self, cb : impl Fn(&T) -> bool) -> bool {
+    pub fn test(&self, cb : impl FnOnce(&T) -> bool) -> bool {
         self.peek().is_some_and(|tok| cb(tok))
     }
 
-    pub fn take(&mut self, cb : impl Fn(&T) -> bool) -> Option<&T> {
+    pub fn take(&mut self, cb : impl FnOnce(&T) -> bool) -> Option<&T> {
         self.test(cb).then_some(self.pop().unwrap())
     }
 
