@@ -37,7 +37,7 @@ impl<T> Scanner<T> {
     pub fn transform<U>(&mut self, cb : impl FnOnce(&T) -> Option<U>) -> Option<U> {
         let tok = self.peek()?;
         let res = cb(tok)?;
-        self.cursor += 1;
+        self.pop().unwrap();
         Some(res)
     }
     
@@ -46,7 +46,7 @@ impl<T> Scanner<T> {
     }
 
     pub fn take(&mut self, cb : impl FnOnce(&T) -> bool) -> Option<&T> {
-        self.test(cb).then_some(self.pop().unwrap())
+        self.test(cb).then(|| self.pop().unwrap())
     }
 
     pub fn take_while(&mut self, cb : impl Fn(&T) -> bool) -> Vec<&T> {
