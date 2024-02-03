@@ -56,7 +56,7 @@ impl Delimiter {
 pub enum Token {
     Group(Delimiter, Vec<Token>),
     Ident(String),
-    Literal(i64),
+    Number(i64),
     Punct(char),
 }
 
@@ -80,31 +80,31 @@ fn get_number(scanner : &mut Scanner<char>) -> Result<Option<Token>, &'static st
     scanner.scan(|chars| match chars {
         ['-'] => Some(ScannerAction::Request(Token::Punct('-'))),
         ['-', ..] if chars.iter().skip(1).all(|c| c.is_digit(10))
-            => Some(ScannerAction::Request(Token::Literal(
+            => Some(ScannerAction::Request(Token::Number(
                 -chars.iter().skip(1).map(|c| **c).collect::<String>().parse::<i64>().unwrap()
             ))),
-        ['0'] => Some(ScannerAction::Request(Token::Literal(0))),
+        ['0'] => Some(ScannerAction::Request(Token::Number(0))),
 
         ['0', 'x'] => Some(ScannerAction::Require),
         ['0', 'x', ..] if chars.iter().skip(2).all(|c| c.is_digit(16))
-            => Some(ScannerAction::Request(Token::Literal(
+            => Some(ScannerAction::Request(Token::Number(
                 i64::from_str_radix(&chars.iter().skip(2).map(|c| **c).collect::<String>(), 16).unwrap()
             ))),
 
         ['0', 'o'] => Some(ScannerAction::Require),
         ['0', 'o', ..] if chars.iter().skip(2).all(|c| c.is_digit(8))
-            => Some(ScannerAction::Request(Token::Literal(
+            => Some(ScannerAction::Request(Token::Number(
                 i64::from_str_radix(&chars.iter().skip(2).map(|c| **c).collect::<String>(), 8).unwrap()
             ))),
 
         ['0', 'b'] => Some(ScannerAction::Require),
         ['0', 'b', ..] if chars.iter().skip(2).all(|c| c.is_digit(2))
-            => Some(ScannerAction::Request(Token::Literal(
+            => Some(ScannerAction::Request(Token::Number(
                 i64::from_str_radix(&chars.iter().skip(2).map(|c| **c).collect::<String>(), 2).unwrap()
             ))),
 
         _ if chars.iter().all(|c| c.is_digit(10))
-            => Some(ScannerAction::Request(Token::Literal(chars.iter().map(|c| **c).collect::<String>().parse().unwrap()))),
+            => Some(ScannerAction::Request(Token::Number(chars.iter().map(|c| **c).collect::<String>().parse().unwrap()))),
 
         _ => None,
     })
@@ -171,19 +171,19 @@ mod test {
     }
 
     #[test]
-    fn literal() {
+    fn number() {
         let code = "0 0x0 0o0 0b0 62263 -62263 0xF337 0o171467 0b1111001100110111";
         let toks = tokenize(code);
         assert_eq!(toks, vec![
-            Token::Literal(0),
-            Token::Literal(0x0),
-            Token::Literal(0o0),
-            Token::Literal(0b0),
-            Token::Literal(62263),
-            Token::Literal(-62263),
-            Token::Literal(0xF337),
-            Token::Literal(0o171467),
-            Token::Literal(0b1111001100110111),
+            Token::Number(0),
+            Token::Number(0x0),
+            Token::Number(0o0),
+            Token::Number(0b0),
+            Token::Number(62263),
+            Token::Number(-62263),
+            Token::Number(0xF337),
+            Token::Number(0o171467),
+            Token::Number(0b1111001100110111),
         ]);
     }
 
@@ -192,14 +192,14 @@ mod test {
         let code = "0 () (0) ((0)) [0] {0}";
         let toks = tokenize(code);
         assert_eq!(toks, vec![
-            Token::Literal(0),
+            Token::Number(0),
             Token::Group(Delimiter::Parenthesis, vec![]),
-            Token::Group(Delimiter::Parenthesis, vec![Token::Literal(0)]),
+            Token::Group(Delimiter::Parenthesis, vec![Token::Number(0)]),
             Token::Group(Delimiter::Parenthesis, vec![
-                Token::Group(Delimiter::Parenthesis, vec![Token::Literal(0)])
+                Token::Group(Delimiter::Parenthesis, vec![Token::Number(0)])
             ]),
-            Token::Group(Delimiter::Bracket, vec![Token::Literal(0)]),
-            Token::Group(Delimiter::Brace, vec![Token::Literal(0)]),
+            Token::Group(Delimiter::Bracket, vec![Token::Number(0)]),
+            Token::Group(Delimiter::Brace, vec![Token::Number(0)]),
         ]);
     }
 }
