@@ -56,8 +56,10 @@ impl Delimiter {
 pub enum Token {
     Group(Delimiter, Vec<Token>),
     Ident(String),
-    Number(i64),
     Punct(char),
+
+    String(String),
+    Number(i64),
 }
 
 fn skip_whitespace(scanner : &mut Scanner<char>) {
@@ -136,6 +138,25 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
         return Some(Token::Group(delim, toks))
     }
 
+    if scanner.take(|c| *c == '"').is_some() {
+        let mut s = String::new();
+        while let Some(c) = scanner.pop() {
+            if *c == '"' {
+                break;
+            } else if *c == '\\' {
+                let Some(c) = scanner.pop() else { panic!() }; // TODO: Handle
+                match c {
+                    '"' => s.push(*c),
+                    _ => panic!("Unknown control sequence: '{c}'"),
+                }
+            } else {
+                s.push(*c)
+            }
+        }
+
+        return Some(Token::String(s))
+    }
+
     None
 }
 
@@ -167,6 +188,16 @@ mod test {
             Token::Ident("nop_".to_string()),
             Token::Ident("no1p".to_string()),
             Token::Ident("nop1".to_string()),
+        ]);
+    }
+
+    #[test]
+    fn string() {
+        let code = r#""A string" "\"A quoted string\"""#;
+        let toks = tokenize(code);
+        assert_eq!(toks, vec![
+            Token::String("A string".to_string()),
+            Token::String("\"A quoted string\"".to_string()),
         ]);
     }
 
