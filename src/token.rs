@@ -84,37 +84,37 @@ fn get_number(scanner : &mut Scanner<char>) -> Result<Option<Token>, &'static st
         ['-'] => Some(ScannerAction::Request(Token::Punct('-'))),
         ['-', ..] if chars.iter().skip(1).all(|c| c.is_digit(10))
             => Some(ScannerAction::Request(Token::Number(
-                -chars.iter().skip(1).map(|c| **c).collect::<String>().parse::<i64>().unwrap()
+                -chars.iter().skip(1).collect::<String>().parse::<i64>().unwrap()
             ))),
         ['0'] => Some(ScannerAction::Request(Token::Number(0))),
 
         ['0', 'x'] => Some(ScannerAction::Require),
         ['0', 'x', ..] if chars.iter().skip(2).all(|c| c.is_digit(16))
             => Some(ScannerAction::Request(Token::Number(
-                i64::from_str_radix(&chars.iter().skip(2).map(|c| **c).collect::<String>(), 16).unwrap()
+                i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 16).unwrap()
             ))),
 
         ['0', 'o'] => Some(ScannerAction::Require),
         ['0', 'o', ..] if chars.iter().skip(2).all(|c| c.is_digit(8))
             => Some(ScannerAction::Request(Token::Number(
-                i64::from_str_radix(&chars.iter().skip(2).map(|c| **c).collect::<String>(), 8).unwrap()
+                i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 8).unwrap()
             ))),
 
         ['0', 'b'] => Some(ScannerAction::Require),
         ['0', 'b', ..] if chars.iter().skip(2).all(|c| c.is_digit(2))
             => Some(ScannerAction::Request(Token::Number(
-                i64::from_str_radix(&chars.iter().skip(2).map(|c| **c).collect::<String>(), 2).unwrap()
+                i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 2).unwrap()
             ))),
 
         _ if chars.iter().all(|c| c.is_digit(10))
-            => Some(ScannerAction::Request(Token::Number(chars.iter().map(|c| **c).collect::<String>().parse().unwrap()))),
+            => Some(ScannerAction::Request(Token::Number(chars.iter().collect::<String>().parse().unwrap()))),
 
         _ => None,
     })
 }
 
 fn matches(scanner : &mut Scanner<char>, accept : impl FnOnce(&char) -> bool, get : impl Fn(&char) -> bool) -> Option<String> {
-    scanner.test(accept).then(|| scanner.take_while(get).iter().map(|c| **c).collect())
+    scanner.test(accept).then(|| scanner.take_while(get).iter().collect())
 }
 
 fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
@@ -142,16 +142,16 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
     if scanner.take(|c| *c == '"').is_some() {
         let mut s = String::new();
         while let Some(c) = scanner.pop() {
-            if *c == '"' {
+            if c == '"' {
                 break;
-            } else if *c == '\\' {
+            } else if c == '\\' {
                 let Some(c) = scanner.pop() else { panic!() }; // TODO: Handle
                 match c {
-                    '"' => s.push(*c),
+                    '"' => s.push(c),
                     _ => panic!("Unknown control sequence: '{c}'"),
                 }
             } else {
-                s.push(*c)
+                s.push(c)
             }
         }
 
@@ -159,9 +159,9 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
     }
 
     if scanner.take(|c| *c == '\'').is_some() {
-        let mut c = *scanner.pop().unwrap(); // TODO: Handle
+        let mut c = scanner.pop().unwrap(); // TODO: Handle
         if c == '\\' {
-            c = *scanner.pop().unwrap();
+            c = scanner.pop().unwrap();
             match c {
                 '\'' => (),
                 _ => panic!("Unknown control sequence: '{c}'"),

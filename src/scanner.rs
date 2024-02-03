@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ScannerAction<T> {
     /// Immediately advance the cursor and return T.
@@ -11,27 +13,24 @@ pub enum ScannerAction<T> {
 }
 
 pub struct Scanner<T> {
-    cursor : usize,
-    toks : Vec<T>,
+    toks : VecDeque<T>,
 }
 
 impl<T> Scanner<T> {
-    pub fn new(toks : Vec<T>) -> Self {
-        Self { cursor: 0, toks }
+    pub fn new(toks : VecDeque<T>) -> Self {
+        Self { toks }
     }
 
     pub fn is_done(&mut self) -> bool {
-        self.cursor == self.toks.len()
+        self.toks.is_empty()
     }
 
     pub fn peek(&self) -> Option<&T> {
-        self.toks.get(self.cursor)
+        self.toks.get(0)
     }
 
-    pub fn pop(&mut self) -> Option<&T> {
-        let tok = self.toks.get(self.cursor)?;
-        self.cursor += 1;
-        Some(tok)
+    pub fn pop(&mut self) -> Option<T> {
+        self.toks.pop_front()
     }
 
     pub fn transform<U>(&mut self, cb : impl FnOnce(&T) -> Option<U>) -> Option<U> {
@@ -45,36 +44,33 @@ impl<T> Scanner<T> {
         self.peek().is_some_and(|tok| cb(tok))
     }
 
-    pub fn take(&mut self, cb : impl FnOnce(&T) -> bool) -> Option<&T> {
+    pub fn take(&mut self, cb : impl FnOnce(&T) -> bool) -> Option<T> {
         self.test(cb).then(|| self.pop().unwrap())
     }
 
-    pub fn take_while(&mut self, cb : impl Fn(&T) -> bool) -> Vec<&T> {
+    pub fn take_while(&mut self, cb : impl Fn(&T) -> bool) -> Vec<T> {
         let mut res = Vec::new();
         while self.test(&cb) {
-            let tok = self.toks.get(self.cursor).unwrap();
-            self.cursor += 1;
-            res.push(tok);
+            res.push(self.pop().unwrap())
         }
-
         res
     }
 
-    pub fn scan<U>(&mut self, cb : impl Fn(&[&T]) -> Option<ScannerAction<U>>) -> Result<Option<U>, &'static str> {
+    pub fn scan<U>(&mut self, cb : impl Fn(&[T]) -> Option<ScannerAction<U>>) -> Result<Option<U>, &'static str> {
         let mut sequence = Vec::new();
         let mut request = None;
         let mut require = false;
 
         loop {
-            let Some(target) = self.toks.get(self.cursor) else {
+            let Some(tok) = self.pop() else {
                 break if require { Err("EOF") } else { Ok(request) }
             };
 
-            sequence.push(target);
+            sequence.push(tok);
             let Some(action) = cb(&sequence[..]) else {
+                self.toks.push_front(sequence.pop().unwrap()); // Put it back
                 break if require { Err("TODO: Error") } else { Ok(request) }
             };
-            self.cursor += 1;
 
             match action {
                 ScannerAction::Return(res) => break Ok(Some(res)),
