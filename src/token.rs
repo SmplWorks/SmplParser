@@ -4,6 +4,7 @@ use crate::{Scanner, ScannerAction};
 pub enum Token {
     Ident(String),
     Punct(char),
+    Comment(String),
 
     String(String),
     Char(char),
@@ -12,6 +13,23 @@ pub enum Token {
 
 fn skip_whitespace(scanner : &mut Scanner<char>) {
     scanner.take_while(|c| c.is_whitespace());
+}
+
+fn match_comment(scanner : &mut Scanner<char>) -> Option<Token> {
+    scanner.take(|c| *c == '/')?;
+
+    if scanner.take(|c| *c == '/').is_some() {
+        let comment = scanner.take_while(|c| !(*c == '\n' || *c == '\r'));
+        Some(Token::Comment(comment.into_iter().collect()))
+    } else if scanner.take(|c| *c == '*').is_some() {
+        scanner.scan(|chars| match chars {
+            ['*', '/'] => ScannerAction::Return(Token::Comment("".to_string())),
+            [comment @ .., '*', '/'] => ScannerAction::Return(Token::Comment(comment.iter().collect())),
+            _ => ScannerAction::Require,
+        }).unwrap() // TODO: Handle
+    } else {
+        Some(Token::Punct('/'))
+    }
 }
 
 fn match_identifier(scanner : &mut Scanner<char>) -> Option<Token> {
@@ -105,6 +123,7 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
     skip_whitespace(scanner);
 
     match_identifier(scanner)
+    .or_else(|| match_comment(scanner))
     .or_else(|| match_string(scanner))
     .or_else(|| match_number(scanner))
     .or_else(|| match_char(scanner))
@@ -176,6 +195,16 @@ mod test {
         assert_eq!(toks, vec![
             Token::Char('0'),
             Token::Char('\''),
+        ]);
+    }
+
+    #[test]
+    fn comment() {
+        let code = "// 0 1 asd\n/* 0 1 *\n * / asd */";
+        let toks = tokenize(code);
+        assert_eq!(toks, vec![
+            Token::Comment(" 0 1 asd".to_string()),
+            Token::Comment(" 0 1 *\n * / asd ".to_string()),
         ]);
     }
 }
