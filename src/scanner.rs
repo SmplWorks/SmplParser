@@ -10,6 +10,8 @@ pub enum ScannerAction<T> {
 
     /// If the next iteration returns None, return None without advancing the cursor.
     Require,
+
+    None,
 }
 
 pub struct Scanner<T> {
@@ -56,7 +58,7 @@ impl<T> Scanner<T> {
         res
     }
 
-    pub fn scan<U>(&mut self, cb : impl Fn(&[T]) -> Option<ScannerAction<U>>) -> Result<Option<U>, &'static str> {
+    pub fn scan<U>(&mut self, cb : impl Fn(&[T]) -> ScannerAction<U>) -> Result<Option<U>, &'static str> {
         let mut sequence = Vec::new();
         let mut request = None;
         let mut require = false;
@@ -67,18 +69,17 @@ impl<T> Scanner<T> {
             };
 
             sequence.push(tok);
-            let Some(action) = cb(&sequence[..]) else {
-                self.toks.push_front(sequence.pop().unwrap()); // Put it back
-                break if require { Err("TODO: Error") } else { Ok(request) }
-            };
-
-            match action {
+            match cb(&sequence[..]) {
                 ScannerAction::Return(res) => break Ok(Some(res)),
                 ScannerAction::Request(res) => {
                     require = false;
                     request = Some(res);
                 },
                 ScannerAction::Require => require = true,
+                ScannerAction::None => {
+                    self.toks.push_front(sequence.pop().unwrap()); // Put it back
+                    break if require { Err("TODO: Error") } else { Ok(request) }
+                }
             }
         }
     }

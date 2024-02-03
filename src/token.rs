@@ -89,35 +89,35 @@ fn match_identifier(scanner : &mut Scanner<char>) -> Option<Token> {
 fn match_number(scanner : &mut Scanner<char>) -> Option<Token> {
     if scanner.test(|c| c.is_ascii_digit() || *c == '-') { // TODO: is_numeric?
         scanner.scan(|chars| match chars {
-            ['-'] => Some(ScannerAction::Request(Token::Punct('-'))),
+            ['-'] => ScannerAction::Request(Token::Punct('-')),
             ['-', ..] if chars.iter().skip(1).all(|c| c.is_digit(10))
-                => Some(ScannerAction::Request(Token::Number(
+                => ScannerAction::Request(Token::Number(
                     -chars.iter().skip(1).collect::<String>().parse::<i64>().unwrap()
-                ))),
-            ['0'] => Some(ScannerAction::Request(Token::Number(0))),
+                )),
+            ['0'] => ScannerAction::Request(Token::Number(0)),
 
-            ['0', 'x'] => Some(ScannerAction::Require),
+            ['0', 'x'] => ScannerAction::Require,
             ['0', 'x', ..] if chars.iter().skip(2).all(|c| c.is_digit(16))
-                => Some(ScannerAction::Request(Token::Number(
+                => ScannerAction::Request(Token::Number(
                     i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 16).unwrap()
-                ))),
+                )),
 
-            ['0', 'o'] => Some(ScannerAction::Require),
+            ['0', 'o'] => ScannerAction::Require,
             ['0', 'o', ..] if chars.iter().skip(2).all(|c| c.is_digit(8))
-                => Some(ScannerAction::Request(Token::Number(
+                => ScannerAction::Request(Token::Number(
                     i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 8).unwrap()
-                ))),
+                )),
 
-            ['0', 'b'] => Some(ScannerAction::Require),
+            ['0', 'b'] => ScannerAction::Require,
             ['0', 'b', ..] if chars.iter().skip(2).all(|c| c.is_digit(2))
-                => Some(ScannerAction::Request(Token::Number(
+                => ScannerAction::Request(Token::Number(
                     i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 2).unwrap()
-                ))),
+                )),
 
             _ if chars.iter().all(|c| c.is_digit(10))
-                => Some(ScannerAction::Request(Token::Number(chars.iter().collect::<String>().parse().unwrap()))),
+                => ScannerAction::Request(Token::Number(chars.iter().collect::<String>().parse().unwrap())),
 
-            _ => None,
+            _ => ScannerAction::None,
         }).unwrap() // TODO: Handle
     } else { None }
 }
