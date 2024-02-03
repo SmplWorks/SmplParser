@@ -67,67 +67,7 @@ fn skip_whitespace(scanner : &mut Scanner<char>) {
     scanner.take_while(|c| c.is_whitespace());
 }
 
-fn accept_identifier(c : &char) -> bool {
-    c.is_alphabetic() || *c == '_'
-}
-
-fn get_identifier(c : &char) -> bool {
-    c.is_alphanumeric() || *c == '_'
-}
-
-fn accept_number(c : &char) -> bool {
-    c.is_ascii_digit() || *c == '-' // TODO: is_numeric?
-}
-
-fn get_number(scanner : &mut Scanner<char>) -> Result<Option<Token>, &'static str> {
-    scanner.scan(|chars| match chars {
-        ['-'] => Some(ScannerAction::Request(Token::Punct('-'))),
-        ['-', ..] if chars.iter().skip(1).all(|c| c.is_digit(10))
-            => Some(ScannerAction::Request(Token::Number(
-                -chars.iter().skip(1).collect::<String>().parse::<i64>().unwrap()
-            ))),
-        ['0'] => Some(ScannerAction::Request(Token::Number(0))),
-
-        ['0', 'x'] => Some(ScannerAction::Require),
-        ['0', 'x', ..] if chars.iter().skip(2).all(|c| c.is_digit(16))
-            => Some(ScannerAction::Request(Token::Number(
-                i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 16).unwrap()
-            ))),
-
-        ['0', 'o'] => Some(ScannerAction::Require),
-        ['0', 'o', ..] if chars.iter().skip(2).all(|c| c.is_digit(8))
-            => Some(ScannerAction::Request(Token::Number(
-                i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 8).unwrap()
-            ))),
-
-        ['0', 'b'] => Some(ScannerAction::Require),
-        ['0', 'b', ..] if chars.iter().skip(2).all(|c| c.is_digit(2))
-            => Some(ScannerAction::Request(Token::Number(
-                i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 2).unwrap()
-            ))),
-
-        _ if chars.iter().all(|c| c.is_digit(10))
-            => Some(ScannerAction::Request(Token::Number(chars.iter().collect::<String>().parse().unwrap()))),
-
-        _ => None,
-    })
-}
-
-fn matches(scanner : &mut Scanner<char>, accept : impl FnOnce(&char) -> bool, get : impl Fn(&char) -> bool) -> Option<String> {
-    scanner.test(accept).then(|| scanner.take_while(get).iter().collect())
-}
-
-fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
-    skip_whitespace(scanner);
-
-    if let Some(ident) = matches(scanner, accept_identifier, get_identifier) {
-        return Some(Token::Ident(ident))
-    }
-
-    if scanner.test(accept_number) {
-        return get_number(scanner).unwrap() // TODO: Handle error
-    }
-
+fn match_group(scanner : &mut Scanner<char>) -> Option<Token> {
     if let Some(delim) = scanner.transform(|c| Delimiter::from_open(c)) {
         let toks = tokenize_scanner(scanner);
         skip_whitespace(scanner);
@@ -136,9 +76,54 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
             panic!("Missing closing delimiter, expected \"{}\" but found \"{:?}\"", delim.close(), scanner.peek()) // TODO: Handle
         }
 
-        return Some(Token::Group(delim, toks))
-    }
+        Some(Token::Group(delim, toks))
+    } else { None }
+}
 
+fn match_identifier(scanner : &mut Scanner<char>) -> Option<Token> {
+    scanner.test(|c| c.is_alphabetic() || *c == '_')
+        .then(|| scanner.take_while(|c| c.is_alphanumeric() || *c == '_').iter().collect())
+        .map(|ident| Token::Ident(ident))
+}
+
+fn match_number(scanner : &mut Scanner<char>) -> Option<Token> {
+    if scanner.test(|c| c.is_ascii_digit() || *c == '-') { // TODO: is_numeric?
+        scanner.scan(|chars| match chars {
+            ['-'] => Some(ScannerAction::Request(Token::Punct('-'))),
+            ['-', ..] if chars.iter().skip(1).all(|c| c.is_digit(10))
+                => Some(ScannerAction::Request(Token::Number(
+                    -chars.iter().skip(1).collect::<String>().parse::<i64>().unwrap()
+                ))),
+            ['0'] => Some(ScannerAction::Request(Token::Number(0))),
+
+            ['0', 'x'] => Some(ScannerAction::Require),
+            ['0', 'x', ..] if chars.iter().skip(2).all(|c| c.is_digit(16))
+                => Some(ScannerAction::Request(Token::Number(
+                    i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 16).unwrap()
+                ))),
+
+            ['0', 'o'] => Some(ScannerAction::Require),
+            ['0', 'o', ..] if chars.iter().skip(2).all(|c| c.is_digit(8))
+                => Some(ScannerAction::Request(Token::Number(
+                    i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 8).unwrap()
+                ))),
+
+            ['0', 'b'] => Some(ScannerAction::Require),
+            ['0', 'b', ..] if chars.iter().skip(2).all(|c| c.is_digit(2))
+                => Some(ScannerAction::Request(Token::Number(
+                    i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 2).unwrap()
+                ))),
+
+            _ if chars.iter().all(|c| c.is_digit(10))
+                => Some(ScannerAction::Request(Token::Number(chars.iter().collect::<String>().parse().unwrap()))),
+
+            _ => None,
+        }).unwrap() // TODO: Handle
+    } else { None }
+}
+
+
+fn match_string(scanner : &mut Scanner<char>) -> Option<Token> {
     if scanner.take(|c| *c == '"').is_some() {
         let mut s = String::new();
         while let Some(c) = scanner.pop() {
@@ -155,9 +140,11 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
             }
         }
 
-        return Some(Token::String(s))
-    }
+        Some(Token::String(s))
+    } else { None }
+}
 
+fn match_char(scanner : &mut Scanner<char>) -> Option<Token> {
     if scanner.take(|c| *c == '\'').is_some() {
         let mut c = scanner.pop().unwrap(); // TODO: Handle
         if c == '\\' {
@@ -171,10 +158,19 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
         if scanner.take(|c| *c == '\'').is_none() {
             panic!("Unclosed character")
         }
-        return Some(Token::Char(c))
-    }
+        
+        Some(Token::Char(c))
+    } else { None }
+}
 
-    None
+fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
+    skip_whitespace(scanner);
+
+    match_identifier(scanner)
+    .or_else(|| match_number(scanner))
+    .or_else(|| match_group(scanner))
+    .or_else(|| match_string(scanner))
+    .or_else(|| match_char(scanner))
 }
 
 fn tokenize_scanner(scanner : &mut Scanner<char>) -> Vec<Token> {
