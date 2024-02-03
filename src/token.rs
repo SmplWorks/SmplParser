@@ -1,60 +1,7 @@
 use crate::{Scanner, ScannerAction};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Delimiter {
-    Parenthesis,
-    Brace,
-    Bracket,
-    None
-}
-
-impl Delimiter {
-    fn from(c : &char) -> Option<Self> {
-        Self::from_open(c).or(Self::from_close(c))
-    }
- 
-    fn from_open(c : &char) -> Option<Self> {
-        match c {
-            '(' => Some(Self::Parenthesis),
-            '[' => Some(Self::Bracket),
-            '{' => Some(Self::Brace),
-            '\0' => Some(Self::None),
-            _ => None,
-        }
-    }
-
-    fn from_close(c : &char) -> Option<Self> {
-        match c {
-            ')' => Some(Self::Parenthesis),
-            ']' => Some(Self::Bracket),
-            '}' => Some(Self::Brace),
-            '\0' => Some(Self::None),
-            _ => None,
-        }
-    }
-
-    pub fn open(&self) -> char {
-        match self {
-            Self::Parenthesis => '(',
-            Self::Bracket => '[',
-            Self::Brace => '{',
-            Self::None => '\0', // TODO: What character?
-        }
-    }
-
-    pub fn close(&self) -> char {
-        match self {
-            Self::Parenthesis => ')',
-            Self::Bracket => ']',
-            Self::Brace => '}',
-            Self::None => '\0', // TODO: What character?
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    Group(Delimiter, Vec<Token>),
     Ident(String),
     Punct(char),
 
@@ -65,19 +12,6 @@ pub enum Token {
 
 fn skip_whitespace(scanner : &mut Scanner<char>) {
     scanner.take_while(|c| c.is_whitespace());
-}
-
-fn match_group(scanner : &mut Scanner<char>) -> Option<Token> {
-    if let Some(delim) = scanner.transform(|c| Delimiter::from_open(c)) {
-        let toks = tokenize_scanner(scanner);
-        skip_whitespace(scanner);
-
-        if scanner.take(|c| *c == delim.close()).is_none() {
-            panic!("Missing closing delimiter, expected \"{}\" but found \"{:?}\"", delim.close(), scanner.peek()) // TODO: Handle
-        }
-
-        Some(Token::Group(delim, toks))
-    } else { None }
 }
 
 fn match_identifier(scanner : &mut Scanner<char>) -> Option<Token> {
@@ -164,15 +98,13 @@ fn match_char(scanner : &mut Scanner<char>) -> Option<Token> {
 }
 
 fn match_punct(scanner : &mut Scanner<char>) -> Option<Token> {
-    scanner.take(|c| *c == ',')
-        .map(|c| Token::Punct(c))
+    Some(Token::Punct(scanner.pop()?))
 }
 
 fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
     skip_whitespace(scanner);
 
-    match_group(scanner)
-    .or_else(|| match_identifier(scanner))
+    match_identifier(scanner)
     .or_else(|| match_string(scanner))
     .or_else(|| match_number(scanner))
     .or_else(|| match_char(scanner))
@@ -244,22 +176,6 @@ mod test {
         assert_eq!(toks, vec![
             Token::Char('0'),
             Token::Char('\''),
-        ]);
-    }
-
-    #[test]
-    fn group() {
-        let code = "0 () (0) ((0)) [0] {0}";
-        let toks = tokenize(code);
-        assert_eq!(toks, vec![
-            Token::Number(0),
-            Token::Group(Delimiter::Parenthesis, vec![]),
-            Token::Group(Delimiter::Parenthesis, vec![Token::Number(0)]),
-            Token::Group(Delimiter::Parenthesis, vec![
-                Token::Group(Delimiter::Parenthesis, vec![Token::Number(0)])
-            ]),
-            Token::Group(Delimiter::Bracket, vec![Token::Number(0)]),
-            Token::Group(Delimiter::Brace, vec![Token::Number(0)]),
         ]);
     }
 }
