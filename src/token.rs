@@ -163,14 +163,20 @@ fn match_char(scanner : &mut Scanner<char>) -> Option<Token> {
     } else { None }
 }
 
+fn match_punct(scanner : &mut Scanner<char>) -> Option<Token> {
+    scanner.take(|c| *c == ',')
+        .map(|c| Token::Punct(c))
+}
+
 fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
     skip_whitespace(scanner);
 
-    match_identifier(scanner)
-    .or_else(|| match_number(scanner))
-    .or_else(|| match_group(scanner))
+    match_group(scanner)
+    .or_else(|| match_identifier(scanner))
     .or_else(|| match_string(scanner))
+    .or_else(|| match_number(scanner))
     .or_else(|| match_char(scanner))
+    .or_else(|| match_punct(scanner))
 }
 
 fn tokenize_scanner(scanner : &mut Scanner<char>) -> Vec<Token> {
