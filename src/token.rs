@@ -59,6 +59,7 @@ pub enum Token {
     Punct(char),
 
     String(String),
+    Char(char),
     Number(i64),
 }
 
@@ -157,6 +158,22 @@ fn get_tok(scanner : &mut Scanner<char>) -> Option<Token> {
         return Some(Token::String(s))
     }
 
+    if scanner.take(|c| *c == '\'').is_some() {
+        let mut c = *scanner.pop().unwrap(); // TODO: Handle
+        if c == '\\' {
+            c = *scanner.pop().unwrap();
+            match c {
+                '\'' => (),
+                _ => panic!("Unknown control sequence: '{c}'"),
+            }
+        }
+
+        if scanner.take(|c| *c == '\'').is_none() {
+            panic!("Unclosed character")
+        }
+        return Some(Token::Char(c))
+    }
+
     None
 }
 
@@ -215,6 +232,16 @@ mod test {
             Token::Number(0xF337),
             Token::Number(0o171467),
             Token::Number(0b1111001100110111),
+        ]);
+    }
+
+    #[test]
+    fn character() {
+        let code = "'0' '\''";
+        let toks = tokenize(code);
+        assert_eq!(toks, vec![
+            Token::Char('0'),
+            Token::Char('\''),
         ]);
     }
 
