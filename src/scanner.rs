@@ -83,4 +83,15 @@ impl<T> Scanner<T> {
             }
         }
     }
+
+    pub fn collect<U>(&mut self, cb : impl Fn(&[T]) -> ScannerAction<U>) -> Result<Vec<U>, &'static str> {
+        let mut res = Vec::new();
+
+        while !self.is_done() {
+            let Some(r) = self.scan(&cb)? else { break };
+            res.push(r)
+        }
+
+        Ok(res)
+    }
 }
