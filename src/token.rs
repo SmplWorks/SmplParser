@@ -35,21 +35,21 @@ fn match_comment(scanner : &mut Scanner<char>) -> Option<Token> {
 fn match_identifier(scanner : &mut Scanner<char>) -> Option<Token> {
     scanner.test(|c| c.is_alphabetic() || *c == '_')
         .then(|| scanner.take_while(|c| c.is_alphanumeric() || *c == '_').iter().collect())
-        .map(|ident| Token::Ident(ident))
+        .map(Token::Ident)
 }
 
 fn match_number(scanner : &mut Scanner<char>) -> Option<Token> {
     if scanner.test(|c| c.is_ascii_digit() || *c == '-') { // TODO: is_numeric?
         scanner.scan(|chars| match chars {
             ['-'] => ScannerAction::Request(Token::Punct('-')),
-            ['-', ..] if chars.iter().skip(1).all(|c| c.is_digit(10))
+            ['-', ..] if chars.iter().skip(1).all(|c| c.is_ascii_digit())
                 => ScannerAction::Request(Token::Number(
                     -chars.iter().skip(1).collect::<String>().parse::<i64>().unwrap()
                 )),
             ['0'] => ScannerAction::Request(Token::Number(0)),
 
             ['0', 'x'] => ScannerAction::Require,
-            ['0', 'x', ..] if chars.iter().skip(2).all(|c| c.is_digit(16))
+            ['0', 'x', ..] if chars.iter().skip(2).all(|c| c.is_ascii_hexdigit())
                 => ScannerAction::Request(Token::Number(
                     i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 16).unwrap()
                 )),
@@ -66,7 +66,7 @@ fn match_number(scanner : &mut Scanner<char>) -> Option<Token> {
                     i64::from_str_radix(&chars.iter().skip(2).collect::<String>(), 2).unwrap()
                 )),
 
-            _ if chars.iter().all(|c| c.is_digit(10))
+            _ if chars.iter().all(|c| c.is_ascii_digit())
                 => ScannerAction::Request(Token::Number(chars.iter().collect::<String>().parse().unwrap())),
 
             _ => ScannerAction::None,

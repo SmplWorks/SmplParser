@@ -28,7 +28,7 @@ impl<T> Scanner<T> {
     }
 
     pub fn peek(&self) -> Option<&T> {
-        self.toks.get(0)
+        self.toks.front()
     }
 
     pub fn pop(&mut self) -> Option<T> {
@@ -43,7 +43,7 @@ impl<T> Scanner<T> {
     }
     
     pub fn test(&self, cb : impl FnOnce(&T) -> bool) -> bool {
-        self.peek().is_some_and(|tok| cb(tok))
+        self.peek().is_some_and(cb)
     }
 
     pub fn take(&mut self, cb : impl FnOnce(&T) -> bool) -> Option<T> {
